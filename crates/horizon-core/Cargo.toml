@@ -7,3 +7,6 @@ license.workspace = true
 [lib]
 name = "horizon_core"
 path = "src/lib.rs"
+
+[dependencies]
+wgpu = "27"

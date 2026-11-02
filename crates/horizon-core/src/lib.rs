@@ -81,3 +81,15 @@ mod tests {
         assert_eq!(chunk.get(16, 0, 0), None);
     }
           }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ChunkPosition {
+    pub x: i32,
+    pub z: i32,
+}
+
+impl ChunkPosition {
+    pub fn new(x: i32, z: i32) -> Self {
+        Self { x, z }
+    }
+}

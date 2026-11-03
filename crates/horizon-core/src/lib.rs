@@ -1,4 +1,5 @@
 pub mod renderer;
+pub mod mesh;
 
 pub const CHUNK_WIDTH: usize = 16;
 pub const CHUNK_HEIGHT: usize = 64;

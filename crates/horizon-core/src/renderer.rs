@@ -1,3 +1,5 @@
+pub const SHADER_SOURCE: &str = include_str!("shader.wgsl");
+
 pub struct GpuContext {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,

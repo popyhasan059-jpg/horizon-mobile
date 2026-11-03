@@ -37,3 +37,21 @@ impl GpuContext {
         Ok(Self { device, queue })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shader_is_valid() {
+        let module = naga::front::wgsl::parse_str(SHADER_SOURCE)
+            .expect("Horizon WGSL shader should be valid");
+
+        naga::valid::Validator::new(
+            naga::valid::ValidationFlags::all(),
+            naga::valid::Capabilities::all(),
+        )
+        .validate(&module)
+        .expect("Horizon WGSL shader validation failed");
+    }
+}

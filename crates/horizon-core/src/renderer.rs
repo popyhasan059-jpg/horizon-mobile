@@ -6,6 +6,17 @@ pub struct GpuContext {
 }
 
 impl GpuContext {
+    pub fn create_shader_module(&self) -> wgpu::ShaderModule {
+        self.device.create_shader_module(
+            wgpu::ShaderModuleDescriptor {
+                label: Some("Horizon Shader"),
+                source: wgpu::ShaderSource::Wgsl(
+                    SHADER_SOURCE.into()
+                ),
+            }
+        )
+    }
+
     pub async fn new() -> Result<Self, String> {
         let instance =
             wgpu::Instance::new(&wgpu::InstanceDescriptor::default());

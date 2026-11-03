@@ -8,6 +8,11 @@ pub struct GpuContext {
     pub queue: wgpu::Queue,
 }
 
+pub struct DepthTexture {
+    pub texture: wgpu::Texture,
+    pub view: wgpu::TextureView,
+}
+
 impl GpuContext {
     pub fn create_shader_module(&self) -> wgpu::ShaderModule {
         self.device.create_shader_module(
@@ -18,6 +23,40 @@ impl GpuContext {
                 ),
             },
         )
+    }
+
+    pub fn create_depth_texture(
+        &self,
+        width: u32,
+        height: u32,
+    ) -> DepthTexture {
+        let size = wgpu::Extent3d {
+            width: width.max(1),
+            height: height.max(1),
+            depth_or_array_layers: 1,
+        };
+
+        let texture = self.device.create_texture(
+            &wgpu::TextureDescriptor {
+                label: Some("Horizon Depth Texture"),
+                size,
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Depth32Float,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                view_formats: &[],
+            },
+        );
+
+        let view = texture.create_view(
+            &wgpu::TextureViewDescriptor::default(),
+        );
+
+        DepthTexture {
+            texture,
+            view,
+        }
     }
 
     pub fn create_render_pipeline(
@@ -62,7 +101,6 @@ impl GpuContext {
                     buffers: &vertex_buffers,
                 },
                 primitive: wgpu::PrimitiveState::default(),
-
                 depth_stencil: Some(
                     wgpu::DepthStencilState {
                         format: wgpu::TextureFormat::Depth32Float,
@@ -72,7 +110,6 @@ impl GpuContext {
                         bias: wgpu::DepthBiasState::default(),
                     },
                 ),
-
                 multisample: wgpu::MultisampleState::default(),
                 fragment: Some(wgpu::FragmentState {
                     module: &shader,
@@ -129,4 +166,4 @@ mod tests {
         .validate(&module)
         .expect("Horizon shader validation failed");
     }
-}
+            }

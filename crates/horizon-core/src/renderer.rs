@@ -36,11 +36,11 @@ impl GpuContext {
             );
 
         let vertex_buffers = [
-            Some(wgpu::VertexBufferLayout {
+            wgpu::VertexBufferLayout {
                 array_stride: 12,
                 step_mode: wgpu::VertexStepMode::Vertex,
                 attributes: &VERTEX_ATTRIBUTES,
-            }),
+            },
         ];
 
         let color_targets = [

@@ -123,6 +123,49 @@ impl GpuContext {
         )
     }
 
+    pub fn encode_render_pass(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        color_view: &wgpu::TextureView,
+        depth_view: &wgpu::TextureView,
+        pipeline: &wgpu::RenderPipeline,
+    ) {
+        let color_attachments = [
+            Some(wgpu::RenderPassColorAttachment {
+                view: color_view,
+                depth_slice: None,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(
+                        wgpu::Color::BLACK,
+                    ),
+                    store: wgpu::StoreOp::Store,
+                },
+            }),
+        ];
+
+        let mut pass = encoder.begin_render_pass(
+            &wgpu::RenderPassDescriptor {
+                label: Some("Horizon Render Pass"),
+                color_attachments: &color_attachments,
+                depth_stencil_attachment: Some(
+                    wgpu::RenderPassDepthStencilAttachment {
+                        view: depth_view,
+                        depth_ops: Some(wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(1.0),
+                            store: wgpu::StoreOp::Store,
+                        }),
+                        stencil_ops: None,
+                    },
+                ),
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            },
+        );
+
+        pass.set_pipeline(pipeline);
+    }
+
     pub async fn new() -> Result<Self, String> {
         let instance =
             wgpu::Instance::new(
@@ -166,4 +209,4 @@ mod tests {
         .validate(&module)
         .expect("Horizon shader validation failed");
     }
-            }
+                        }

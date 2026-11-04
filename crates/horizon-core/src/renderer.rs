@@ -1,3 +1,5 @@
+use wgpu::util::DeviceExt;
+
 pub const SHADER_SOURCE: &str = include_str!("shader.wgsl");
 
 const VERTEX_ATTRIBUTES: [wgpu::VertexAttribute; 1] =
@@ -11,6 +13,12 @@ pub struct GpuContext {
 pub struct DepthTexture {
     pub texture: wgpu::Texture,
     pub view: wgpu::TextureView,
+}
+
+pub struct GpuMesh {
+    pub vertex_buffer: wgpu::Buffer,
+    pub index_buffer: wgpu::Buffer,
+    pub index_count: u32,
 }
 
 impl GpuContext {
@@ -53,9 +61,53 @@ impl GpuContext {
             &wgpu::TextureViewDescriptor::default(),
         );
 
-        DepthTexture {
-            texture,
-            view,
+        DepthTexture { texture, view }
+    }
+
+    pub fn create_gpu_mesh(
+        &self,
+        mesh: &crate::mesh::Mesh,
+    ) -> GpuMesh {
+        let mut vertex_bytes = Vec::new();
+
+        for vertex in &mesh.vertices {
+            for component in vertex {
+                vertex_bytes.extend_from_slice(
+                    &component.to_ne_bytes(),
+                );
+            }
+        }
+
+        let mut index_bytes = Vec::new();
+
+        for index in &mesh.indices {
+            index_bytes.extend_from_slice(
+                &index.to_ne_bytes(),
+            );
+        }
+
+        let vertex_buffer =
+            self.device.create_buffer_init(
+                &wgpu::util::BufferInitDescriptor {
+                    label: Some("Horizon Cube Vertices"),
+                    contents: &vertex_bytes,
+                    usage: wgpu::BufferUsages::VERTEX,
+                },
+            );
+
+        let index_buffer =
+            self.device.create_buffer_init(
+                &wgpu::util::BufferInitDescriptor {
+                    label: Some("Horizon Cube Indices"),
+                    contents: &index_bytes,
+                    usage: wgpu::BufferUsages::INDEX,
+                },
+            );
+
+        GpuMesh {
+            vertex_buffer,
+            index_buffer,
+            index_count: mesh.indices.len() as u32,
         }
     }
 
@@ -129,6 +181,7 @@ impl GpuContext {
         color_view: &wgpu::TextureView,
         depth_view: &wgpu::TextureView,
         pipeline: &wgpu::RenderPipeline,
+        mesh: &GpuMesh,
     ) {
         let color_attachments = [
             Some(wgpu::RenderPassColorAttachment {
@@ -164,6 +217,22 @@ impl GpuContext {
         );
 
         pass.set_pipeline(pipeline);
+
+        pass.set_vertex_buffer(
+            0,
+            mesh.vertex_buffer.slice(..),
+        );
+
+        pass.set_index_buffer(
+            mesh.index_buffer.slice(..),
+            wgpu::IndexFormat::Uint16,
+        );
+
+        pass.draw_indexed(
+            0..mesh.index_count,
+            0,
+            0..1,
+        );
     }
 
     pub async fn new() -> Result<Self, String> {
@@ -209,4 +278,4 @@ mod tests {
         .validate(&module)
         .expect("Horizon shader validation failed");
     }
-                        }
+                    }

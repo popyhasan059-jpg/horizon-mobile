@@ -235,6 +235,33 @@ impl GpuContext {
         );
     }
 
+    pub fn render_frame(
+        &self,
+        color_view: &wgpu::TextureView,
+        depth_view: &wgpu::TextureView,
+        pipeline: &wgpu::RenderPipeline,
+        mesh: &GpuMesh,
+    ) -> wgpu::SubmissionIndex {
+        let mut encoder =
+            self.device.create_command_encoder(
+                &wgpu::CommandEncoderDescriptor {
+                    label: Some("Horizon Frame Encoder"),
+                },
+            );
+
+        self.encode_render_pass(
+            &mut encoder,
+            color_view,
+            depth_view,
+            pipeline,
+            mesh,
+        );
+
+        let command_buffer = encoder.finish();
+
+        self.queue.submit([command_buffer])
+    }
+
     pub async fn new() -> Result<Self, String> {
         let instance =
             wgpu::Instance::new(
@@ -278,4 +305,4 @@ mod tests {
         .validate(&module)
         .expect("Horizon shader validation failed");
     }
-                    }
+                }

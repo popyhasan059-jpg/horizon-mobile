@@ -1,5 +1,7 @@
 use wgpu::util::DeviceExt;
 
+use crate::camera::Camera;
+
 pub const SHADER_SOURCE: &str = include_str!("shader.wgsl");
 
 const VERTEX_ATTRIBUTES: [wgpu::VertexAttribute; 1] =
@@ -21,7 +23,96 @@ pub struct GpuMesh {
     pub index_count: u32,
 }
 
+pub struct CameraGpuResources {
+    pub layout: wgpu::BindGroupLayout,
+    pub buffer: wgpu::Buffer,
+    pub bind_group: wgpu::BindGroup,
+}
+
 impl GpuContext {
+    fn camera_uniform_bytes(camera: &Camera) -> Vec<u8> {
+        let matrix = camera.view_projection_matrix();
+        let values = matrix.to_cols_array();
+
+        let mut bytes = Vec::with_capacity(64);
+
+        for value in values {
+            bytes.extend_from_slice(&value.to_ne_bytes());
+        }
+
+        bytes
+    }
+
+    pub fn create_camera_resources(
+        &self,
+        camera: &Camera,
+    ) -> CameraGpuResources {
+        let layout =
+            self.device.create_bind_group_layout(
+                &wgpu::BindGroupLayoutDescriptor {
+                    label: Some("Horizon Camera Layout"),
+                    entries: &[
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStages::VERTEX,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                    ],
+                },
+            );
+
+        let initial_data = Self::camera_uniform_bytes(camera);
+
+        let buffer =
+            self.device.create_buffer_init(
+                &wgpu::util::BufferInitDescriptor {
+                    label: Some("Horizon Camera Uniform"),
+                    contents: &initial_data,
+                    usage: wgpu::BufferUsages::UNIFORM
+                        | wgpu::BufferUsages::COPY_DST,
+                },
+            );
+
+        let bind_group =
+            self.device.create_bind_group(
+                &wgpu::BindGroupDescriptor {
+                    label: Some("Horizon Camera Bind Group"),
+                    layout: &layout,
+                    entries: &[
+                        wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: buffer.as_entire_binding(),
+                        },
+                    ],
+                },
+            );
+
+        CameraGpuResources {
+            layout,
+            buffer,
+            bind_group,
+        }
+    }
+
+    pub fn update_camera(
+        &self,
+        resources: &CameraGpuResources,
+        camera: &Camera,
+    ) {
+        let data = Self::camera_uniform_bytes(camera);
+
+        self.queue.write_buffer(
+            &resources.buffer,
+            0,
+            &data,
+        );
+    }
+
     pub fn create_shader_module(&self) -> wgpu::ShaderModule {
         self.device.create_shader_module(
             wgpu::ShaderModuleDescriptor {
@@ -114,6 +205,7 @@ impl GpuContext {
     pub fn create_render_pipeline(
         &self,
         format: wgpu::TextureFormat,
+        camera_layout: &wgpu::BindGroupLayout,
     ) -> wgpu::RenderPipeline {
         let shader = self.create_shader_module();
 
@@ -121,7 +213,7 @@ impl GpuContext {
             self.device.create_pipeline_layout(
                 &wgpu::PipelineLayoutDescriptor {
                     label: Some("Horizon Pipeline Layout"),
-                    bind_group_layouts: &[],
+                    bind_group_layouts: &[camera_layout],
                     push_constant_ranges: &[],
                 },
             );
@@ -182,6 +274,7 @@ impl GpuContext {
         depth_view: &wgpu::TextureView,
         pipeline: &wgpu::RenderPipeline,
         mesh: &GpuMesh,
+        camera: &CameraGpuResources,
     ) {
         let color_attachments = [
             Some(wgpu::RenderPassColorAttachment {
@@ -218,6 +311,12 @@ impl GpuContext {
 
         pass.set_pipeline(pipeline);
 
+        pass.set_bind_group(
+            0,
+            &camera.bind_group,
+            &[],
+        );
+
         pass.set_vertex_buffer(
             0,
             mesh.vertex_buffer.slice(..),
@@ -241,6 +340,7 @@ impl GpuContext {
         depth_view: &wgpu::TextureView,
         pipeline: &wgpu::RenderPipeline,
         mesh: &GpuMesh,
+        camera: &CameraGpuResources,
     ) -> wgpu::SubmissionIndex {
         let mut encoder =
             self.device.create_command_encoder(
@@ -255,6 +355,7 @@ impl GpuContext {
             depth_view,
             pipeline,
             mesh,
+            camera,
         );
 
         let command_buffer = encoder.finish();
@@ -293,6 +394,14 @@ mod tests {
     use super::*;
 
     #[test]
+    fn camera_uniform_has_correct_size() {
+        let camera = Camera::new(1280, 720);
+        let bytes = GpuContext::camera_uniform_bytes(&camera);
+
+        assert_eq!(bytes.len(), 64);
+    }
+
+    #[test]
     fn shader_is_valid() {
         let module =
             naga::front::wgsl::parse_str(SHADER_SOURCE)
@@ -305,4 +414,4 @@ mod tests {
         .validate(&module)
         .expect("Horizon shader validation failed");
     }
-                }
+            }

@@ -1,9 +1,11 @@
+pub mod camera;
 pub mod renderer;
 pub mod mesh;
 
 pub const CHUNK_WIDTH: usize = 16;
 pub const CHUNK_HEIGHT: usize = 64;
-pub const CHUNK_VOLUME: usize = CHUNK_WIDTH * CHUNK_WIDTH * CHUNK_HEIGHT;
+pub const CHUNK_VOLUME: usize =
+    CHUNK_WIDTH * CHUNK_WIDTH * CHUNK_HEIGHT;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Block {
@@ -26,14 +28,26 @@ impl Chunk {
     }
 
     fn index(x: usize, y: usize, z: usize) -> Option<usize> {
-        if x >= CHUNK_WIDTH || y >= CHUNK_HEIGHT || z >= CHUNK_WIDTH {
+        if x >= CHUNK_WIDTH
+            || y >= CHUNK_HEIGHT
+            || z >= CHUNK_WIDTH
+        {
             return None;
         }
 
-        Some(y * CHUNK_WIDTH * CHUNK_WIDTH + z * CHUNK_WIDTH + x)
+        Some(
+            y * CHUNK_WIDTH * CHUNK_WIDTH
+                + z * CHUNK_WIDTH
+                + x,
+        )
     }
 
-    pub fn get(&self, x: usize, y: usize, z: usize) -> Option<Block> {
+    pub fn get(
+        &self,
+        x: usize,
+        y: usize,
+        z: usize,
+    ) -> Option<Block> {
         let index = Self::index(x, y, z)?;
         Some(self.blocks[index])
     }
@@ -60,6 +74,18 @@ impl Default for Chunk {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ChunkPosition {
+    pub x: i32,
+    pub z: i32,
+}
+
+impl ChunkPosition {
+    pub fn new(x: i32, z: i32) -> Self {
+        Self { x, z }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -82,17 +108,5 @@ mod tests {
         let mut chunk = Chunk::new();
         assert!(!chunk.set(16, 0, 0, Block::Stone));
         assert_eq!(chunk.get(16, 0, 0), None);
-    }
-          }
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ChunkPosition {
-    pub x: i32,
-    pub z: i32,
-}
-
-impl ChunkPosition {
-    pub fn new(x: i32, z: i32) -> Self {
-        Self { x, z }
     }
 }

@@ -19,6 +19,8 @@ pub enum Block {
     Dirt,
     Stone,
     Water,
+    Sand,
+    Snow,
 }
 
 pub struct Chunk {
@@ -114,4 +116,4 @@ mod tests {
         assert!(!chunk.set(16, 0, 0, Block::Stone));
         assert_eq!(chunk.get(16, 0, 0), None);
     }
-}
+                                            }

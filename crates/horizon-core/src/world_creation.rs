@@ -1,3 +1,5 @@
+use crate::{Chunk, ChunkPosition};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GameMode {
     Survival,
@@ -70,7 +72,6 @@ impl WorldCreationOptions {
             return number;
         }
 
-        // Stable hash for text-based seeds.
         let mut hash = 0xcbf29ce484222325_u64;
 
         for byte in seed.bytes() {
@@ -80,11 +81,23 @@ impl WorldCreationOptions {
 
         hash
     }
+
+    // Generate terrain using the seed selected in the creation menu.
+    pub fn generate_chunk(
+        &self,
+        random_seed: u64,
+        position: ChunkPosition,
+    ) -> Chunk {
+        let seed = self.resolved_seed(random_seed);
+
+        crate::world::generate_chunk(seed, position)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::world::terrain_height;
 
     #[test]
     fn default_options_are_correct() {
@@ -142,4 +155,47 @@ mod tests {
 
         assert_eq!(options.resolved_seed(54321), 54321);
     }
-  }
+
+    #[test]
+    fn selected_seed_controls_terrain_generation() {
+        let mut options = WorldCreationOptions::new();
+
+        options.set_seed("12345".to_string());
+
+        let position = ChunkPosition::new(0, 0);
+
+        let chunk = options.generate_chunk(999, position);
+
+        let expected_height = terrain_height(12345, 5, 5);
+
+        assert_eq!(
+            chunk.get(5, expected_height, 5),
+            Some(crate::Block::Grass)
+        );
+    }
+
+    #[test]
+    fn same_seed_generates_same_terrain() {
+        let mut first = WorldCreationOptions::new();
+        let mut second = WorldCreationOptions::new();
+
+        first.set_seed("Horizon".to_string());
+        second.set_seed("Horizon".to_string());
+
+        let position = ChunkPosition::new(0, 0);
+
+        let a = first.generate_chunk(100, position);
+        let b = second.generate_chunk(200, position);
+
+        for x in 0..crate::CHUNK_WIDTH {
+            for z in 0..crate::CHUNK_WIDTH {
+                for y in 0..crate::CHUNK_HEIGHT {
+                    assert_eq!(
+                        a.get(x, y, z),
+                        b.get(x, y, z)
+                    );
+                }
+            }
+        }
+    }
+}

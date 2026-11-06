@@ -1,3 +1,4 @@
+pub mod player;
 pub mod camera;
 pub mod renderer;
 pub mod mesh;

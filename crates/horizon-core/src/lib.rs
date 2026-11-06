@@ -5,6 +5,7 @@ pub mod renderer;
 pub mod mesh;
 pub mod world;
 pub mod world_creation;
+pub mod biome;
 
 pub const CHUNK_WIDTH: usize = 16;
 pub const CHUNK_HEIGHT: usize = 64;

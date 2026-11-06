@@ -58,6 +58,60 @@ impl Camera {
         self.projection_matrix() * self.view_matrix()
     }
 
+    // Horizontal movement
+    pub fn move_forward(&mut self, distance: f32) {
+        let yaw = self.yaw_degrees.to_radians();
+
+        let forward = Vec3::new(
+            yaw.sin(),
+            0.0,
+            -yaw.cos(),
+        );
+
+        self.position += forward * distance;
+    }
+
+    pub fn move_backward(&mut self, distance: f32) {
+        self.move_forward(-distance);
+    }
+
+    pub fn move_right(&mut self, distance: f32) {
+        let yaw = self.yaw_degrees.to_radians();
+
+        let right = Vec3::new(
+            yaw.cos(),
+            0.0,
+            yaw.sin(),
+        );
+
+        self.position += right * distance;
+    }
+
+    pub fn move_left(&mut self, distance: f32) {
+        self.move_right(-distance);
+    }
+
+    // Vertical movement
+    pub fn move_up(&mut self, distance: f32) {
+        self.position.y += distance;
+    }
+
+    pub fn move_down(&mut self, distance: f32) {
+        self.position.y -= distance;
+    }
+
+    // Mouse-look style rotation, ready for touch input
+    pub fn rotate_by(
+        &mut self,
+        yaw_delta: f32,
+        pitch_delta: f32,
+    ) {
+        self.set_rotation(
+            self.yaw_degrees + yaw_delta,
+            self.pitch_degrees + pitch_delta,
+        );
+    }
+
     pub fn set_rotation(
         &mut self,
         yaw: f32,
@@ -103,8 +157,58 @@ mod tests {
     #[test]
     fn camera_projection_is_valid() {
         let camera = Camera::new(1280, 720);
-        let matrix = camera.view_projection_matrix();
-
-        assert!(matrix.is_finite());
+        assert!(camera.view_projection_matrix().is_finite());
     }
-  }
+
+    #[test]
+    fn camera_moves_forward() {
+        let mut camera = Camera::new(1280, 720);
+        let original = camera.position;
+
+        camera.move_forward(1.0);
+
+        assert!(camera.position.z < original.z);
+    }
+
+    #[test]
+    fn camera_moves_backward() {
+        let mut camera = Camera::new(1280, 720);
+        let original = camera.position;
+
+        camera.move_backward(1.0);
+
+        assert!(camera.position.z > original.z);
+    }
+
+    #[test]
+    fn camera_moves_left_and_right() {
+        let mut camera = Camera::new(1280, 720);
+
+        camera.move_right(1.0);
+        assert!(camera.position.x > 0.0);
+
+        camera.move_left(2.0);
+        assert!(camera.position.x < 0.0);
+    }
+
+    #[test]
+    fn camera_can_move_vertically() {
+        let mut camera = Camera::new(1280, 720);
+
+        camera.move_up(2.0);
+        assert_eq!(camera.position.y, 4.0);
+
+        camera.move_down(1.0);
+        assert_eq!(camera.position.y, 3.0);
+    }
+
+    #[test]
+    fn camera_rotation_is_clamped() {
+        let mut camera = Camera::new(1280, 720);
+
+        camera.rotate_by(10.0, 200.0);
+
+        assert_eq!(camera.yaw_degrees, 10.0);
+        assert_eq!(camera.pitch_degrees, 89.9);
+    }
+    }

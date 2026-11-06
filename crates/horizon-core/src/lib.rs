@@ -21,6 +21,12 @@ pub enum Block {
     Water,
     Sand,
     Snow,
+    Log,
+    Leaves,
+    SnowyLeaves,
+    Cactus,
+    TallGrass,
+    Flower,
 }
 
 pub struct Chunk {
@@ -116,4 +122,12 @@ mod tests {
         assert!(!chunk.set(16, 0, 0, Block::Stone));
         assert_eq!(chunk.get(16, 0, 0), None);
     }
-                                            }
+
+    #[test]
+    fn vegetation_blocks_are_available() {
+        assert_ne!(Block::Log, Block::Air);
+        assert_ne!(Block::Leaves, Block::Air);
+        assert_ne!(Block::Cactus, Block::Air);
+        assert_ne!(Block::Flower, Block::Air);
+    }
+        }

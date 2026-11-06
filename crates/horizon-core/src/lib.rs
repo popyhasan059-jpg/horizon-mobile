@@ -1,3 +1,4 @@
+pub mod game;
 pub mod player;
 pub mod camera;
 pub mod renderer;

@@ -63,6 +63,237 @@ fn surface_block(biome: Biome) -> Block {
     }
 }
 
+fn place_leaves(
+    chunk: &mut Chunk,
+    x: usize,
+    y: usize,
+    z: usize,
+    block: Block,
+) {
+    if x >= CHUNK_WIDTH
+        || y >= CHUNK_HEIGHT
+        || z >= CHUNK_WIDTH
+    {
+        return;
+    }
+
+    if chunk.get(x, y, z) == Some(Block::Air) {
+        chunk.set(x, y, z, block);
+    }
+}
+
+fn place_tree(
+    chunk: &mut Chunk,
+    x: usize,
+    ground_y: usize,
+    z: usize,
+    snowy: bool,
+) {
+    let trunk_height = 4;
+    if ground_y + trunk_height + 2 >= CHUNK_HEIGHT {
+        return;
+    }
+
+    let leaf_block = if snowy {
+        Block::SnowyLeaves
+    } else {
+        Block::Leaves
+    };
+
+    for offset in 1..=trunk_height {
+        chunk.set(x, ground_y + offset, z, Block::Log);
+    }
+
+    // Lower leaf layer.
+    for dx in -2i32..=2 {
+        for dz in -2i32..=2 {
+            if dx.abs() == 2 && dz.abs() == 2 {
+                continue;
+            }
+
+            let lx = x as i32 + dx;
+            let lz = z as i32 + dz;
+
+            if lx >= 0 && lz >= 0 {
+                place_leaves(
+                    chunk,
+                    lx as usize,
+                    ground_y + 3,
+                    lz as usize,
+                    leaf_block,
+                );
+            }
+        }
+    }
+
+    // Upper leaf layer.
+    for dx in -1i32..=1 {
+        for dz in -1i32..=1 {
+            let lx = x as i32 + dx;
+            let lz = z as i32 + dz;
+
+            if lx >= 0 && lz >= 0 {
+                place_leaves(
+                    chunk,
+                    lx as usize,
+                    ground_y + 4,
+                    lz as usize,
+                    leaf_block,
+                );
+            }
+        }
+    }
+
+    place_leaves(
+        chunk,
+        x,
+        ground_y + 5,
+        z,
+        leaf_block,
+    );
+}
+
+fn place_vegetation(
+    seed: u64,
+    position: ChunkPosition,
+    chunk: &mut Chunk,
+) {
+    let origin_x =
+        position.x.saturating_mul(CHUNK_WIDTH as i32);
+    let origin_z =
+        position.z.saturating_mul(CHUNK_WIDTH as i32);
+
+    for local_x in 0..CHUNK_WIDTH {
+        for local_z in 0..CHUNK_WIDTH {
+            let world_x =
+                origin_x.saturating_add(local_x as i32);
+            let world_z =
+                origin_z.saturating_add(local_z as i32);
+
+            let ground_y = terrain_height(
+                seed,
+                world_x,
+                world_z,
+            )
+            .min(CHUNK_HEIGHT - 1);
+
+            if ground_y < SEA_LEVEL {
+                continue;
+            }
+
+            let biome = biome_at(seed, world_x, world_z);
+            let surface = surface_block(biome);
+
+            if chunk.get(local_x, ground_y, local_z)
+                != Some(surface)
+            {
+                continue;
+            }
+
+            let above = ground_y + 1;
+            if above >= CHUNK_HEIGHT {
+                continue;
+            }
+
+            match biome {
+                Biome::Forest => {
+                    // Keep tree canopies inside this chunk.
+                    if local_x >= 2
+                        && local_x < CHUNK_WIDTH - 2
+                        && local_z >= 2
+                        && local_z < CHUNK_WIDTH - 2
+                        && hash_height(
+                            seed ^ 0xA11CE,
+                            world_x,
+                            world_z,
+                        ) < 0.025
+                    {
+                        place_tree(
+                            chunk,
+                            local_x,
+                            ground_y,
+                            local_z,
+                            false,
+                        );
+                    }
+                }
+
+                Biome::SnowyTaiga => {
+                    if local_x >= 2
+                        && local_x < CHUNK_WIDTH - 2
+                        && local_z >= 2
+                        && local_z < CHUNK_WIDTH - 2
+                        && hash_height(
+                            seed ^ 0x5A0,
+                            world_x,
+                            world_z,
+                        ) < 0.02
+                    {
+                        place_tree(
+                            chunk,
+                            local_x,
+                            ground_y,
+                            local_z,
+                            true,
+                        );
+                    }
+                }
+
+                Biome::Desert => {
+                    if hash_height(
+                        seed ^ 0xCACT05,
+                        world_x,
+                        world_z,
+                    ) < 0.012
+                    {
+                        let cactus_height =
+                            2 + (hash_height(
+                                seed ^ 0xCA7,
+                                world_x,
+                                world_z,
+                            ) * 3.0) as usize;
+
+                        for offset in 1..=cactus_height {
+                            if ground_y + offset < CHUNK_HEIGHT {
+                                chunk.set(
+                                    local_x,
+                                    ground_y + offset,
+                                    local_z,
+                                    Block::Cactus,
+                                );
+                            }
+                        }
+                    }
+                }
+
+                Biome::Plains => {
+                    let plant = hash_height(
+                        seed ^ 0xF10,
+                        world_x,
+                        world_z,
+                    );
+
+                    if plant < 0.025 {
+                        chunk.set(
+                            local_x,
+                            above,
+                            local_z,
+                            Block::Flower,
+                        );
+                    } else if plant < 0.12 {
+                        chunk.set(
+                            local_x,
+                            above,
+                            local_z,
+                            Block::TallGrass,
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
 pub fn generate_chunk(
     seed: u64,
     position: ChunkPosition,
@@ -74,6 +305,7 @@ pub fn generate_chunk(
     let origin_z =
         position.z.saturating_mul(CHUNK_WIDTH as i32);
 
+    // Generate terrain first.
     for local_x in 0..CHUNK_WIDTH {
         for local_z in 0..CHUNK_WIDTH {
             let world_x =
@@ -103,7 +335,6 @@ pub fn generate_chunk(
                 chunk.set(local_x, y, local_z, block);
             }
 
-            // Fill low areas with water.
             if height < SEA_LEVEL {
                 for y in (height + 1)..=SEA_LEVEL {
                     if y < CHUNK_HEIGHT {
@@ -119,6 +350,9 @@ pub fn generate_chunk(
         }
     }
 
+    // Generate plants and trees after terrain.
+    place_vegetation(seed, position, &mut chunk);
+
     chunk
 }
 
@@ -126,24 +360,26 @@ pub fn generate_chunk(
 mod tests {
     use super::*;
 
-    #[test]
-    fn generated_chunk_contains_terrain() {
-        let chunk =
-            generate_chunk(12345, ChunkPosition::new(0, 0));
-
-        let mut found_terrain = false;
-
+    fn chunk_has_block(chunk: &Chunk, target: Block) -> bool {
         for x in 0..CHUNK_WIDTH {
             for z in 0..CHUNK_WIDTH {
                 for y in 0..CHUNK_HEIGHT {
-                    if chunk.get(x, y, z) != Some(Block::Air) {
-                        found_terrain = true;
+                    if chunk.get(x, y, z) == Some(target) {
+                        return true;
                     }
                 }
             }
         }
 
-        assert!(found_terrain);
+        false
+    }
+
+    #[test]
+    fn generated_chunk_contains_terrain() {
+        let chunk =
+            generate_chunk(12345, ChunkPosition::new(0, 0));
+
+        assert!(chunk_has_block(&chunk, Block::Stone));
     }
 
     #[test]
@@ -257,4 +493,50 @@ mod tests {
 
         panic!("No snowy taiga biome found in test area");
     }
-                    }
+
+    #[test]
+    fn vegetation_generation_is_deterministic() {
+        let first =
+            generate_chunk(12345, ChunkPosition::new(3, 4));
+        let second =
+            generate_chunk(12345, ChunkPosition::new(3, 4));
+
+        for x in 0..CHUNK_WIDTH {
+            for z in 0..CHUNK_WIDTH {
+                for y in 0..CHUNK_HEIGHT {
+                    assert_eq!(
+                        first.get(x, y, z),
+                        second.get(x, y, z)
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn vegetation_appears_in_generated_world() {
+        let mut found_tree = false;
+        let mut found_cactus = false;
+        let mut found_grass = false;
+        let mut found_flower = false;
+
+        for chunk_x in 0..8 {
+            for chunk_z in 0..8 {
+                let chunk = generate_chunk(
+                    12345,
+                    ChunkPosition::new(chunk_x, chunk_z),
+                );
+
+                found_tree |= chunk_has_block(&chunk, Block::Log);
+                found_cactus |= chunk_has_block(&chunk, Block::Cactus);
+                found_grass |= chunk_has_block(&chunk, Block::TallGrass);
+                found_flower |= chunk_has_block(&chunk, Block::Flower);
+            }
+        }
+
+        assert!(found_tree, "No trees generated");
+        assert!(found_cactus, "No cacti generated");
+        assert!(found_grass, "No tall grass generated");
+        assert!(found_flower, "No flowers generated");
+    }
+        }

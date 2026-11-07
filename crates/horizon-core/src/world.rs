@@ -90,6 +90,7 @@ fn place_tree(
     snowy: bool,
 ) {
     let trunk_height = 4;
+
     if ground_y + trunk_height + 2 >= CHUNK_HEIGHT {
         return;
     }
@@ -191,13 +192,13 @@ fn place_vegetation(
             }
 
             let above = ground_y + 1;
+
             if above >= CHUNK_HEIGHT {
                 continue;
             }
 
             match biome {
                 Biome::Forest => {
-                    // Keep tree canopies inside this chunk.
                     if local_x >= 2
                         && local_x < CHUNK_WIDTH - 2
                         && local_z >= 2
@@ -241,7 +242,7 @@ fn place_vegetation(
 
                 Biome::Desert => {
                     if hash_height(
-                        seed ^ 0xCACT05,
+                        seed ^ 0xCAC705,
                         world_x,
                         world_z,
                     ) < 0.012
@@ -335,6 +336,7 @@ pub fn generate_chunk(
                 chunk.set(local_x, y, local_z, block);
             }
 
+            // Fill low areas with water.
             if height < SEA_LEVEL {
                 for y in (height + 1)..=SEA_LEVEL {
                     if y < CHUNK_HEIGHT {
@@ -350,7 +352,7 @@ pub fn generate_chunk(
         }
     }
 
-    // Generate plants and trees after terrain.
+    // Generate vegetation after terrain.
     place_vegetation(seed, position, &mut chunk);
 
     chunk
@@ -539,4 +541,4 @@ mod tests {
         assert!(found_grass, "No tall grass generated");
         assert!(found_flower, "No flowers generated");
     }
-        }
+    }
